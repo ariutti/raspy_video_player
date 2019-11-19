@@ -1,65 +1,55 @@
 #!/usr/bin/env python3
 
+# see https://git.videolan.org/?p=vlc/bindings/python.git;a=blob;f=generated/3.0/vlc.py;h=e3245a5116946a4b52cadf5642441daa97af022d;hb=HEAD for reference
 
-## AN EXPERIMENT IN USING VLC PYTHON BINDING TO PLAY A VIDEO MEDIA FILE
+import vlc, time
 
-# for the reference see https://git.videolan.org/?p=vlc/bindings/python.git;a=blob;f=generated/3.0/vlc.py;h=e3245a5116946a4b52cadf5642441daa97af022d;hb=HEAD
+# player is an instance of MediaPlayer
+player = vlc.MediaPlayer("/home/pi/Documents/repos/raspy_video_player/_wip/nuovi_test/vlc/alvanoto.mp4")
+#player = vlc.MediaPlayer("/home/nicola/Documenti/_sketchbooks/python_scripts/vlc/alvanoto.mp4")
+print("file loaded and playing")
+#player.toggle_fullscreen() # use it to go fullscreen
 
-import vlc, time, sys
-pathToFile = "./Aboca_IST_ITA_subENG_set2018.mp4"
+# use below function to play the movie
+player.play()
 
+# use below function after the video is in play
+# set position between 0.0 and 1.0
+print( "start video from position 0.5")
+player.set_position(0.5) 
 
-if __name__ == '__main__':
-	# player is an instance of MediaPlayer
-	#player = vlc.MediaPlayer("/home/pi/Videos/alvanoto.mp4")
-	player = vlc.MediaPlayer( pathToFile )
-	print("file loaded and playing")
-	player.toggle_fullscreen() # use it to go fullscreen
-	
-	player.play()
-	
-	
-	"""
+# get the actual volume of the vlc player (0-100)
+# return: 0 if the volume was set, -1 if it was out of range.
+print( "audio volume is {}".format(player.audio_get_volume() ) )
 
-	# use below function to play the movie
-	player.play()
+time.sleep( 2 )
 
+# use below function to set a new audio volume for the player
+player.audio_set_volume(70)
 
+print( "audio volume now is {}".format( player.audio_get_volume() ) )
 
-	# use below function after the video is in play
-	# set position between 0.0 and 1.0
-	player.set_position(0.5) 
+time.sleep(2)
 
-	# get the actual volume of the vlc player (0-100)
-	# return: 0 if the volume was set, -1 if it was out of range.
-	print( player.audio_get_volume() )
+# prior to put the video in pause it have to play for a minimum time
+print("pause")
+player.pause()
 
-	# use below function to set a new audio volume for the player
-	player.audio_set_volume(70)
+time.sleep(2)
 
-	print( player.audio_get_volume() )
+# calling pause two time will restart the playback
+print("un-pause")
+player.pause()
 
-	time.sleep(2)
+time.sleep(2)
 
-	# prior to put the video in pause it have to play for a minimum time
-	print("pause")
-	player.pause()
+print("going back to position 0")
+player.set_position(0) # use this method to restart the playback from the beginning
 
-	time.sleep(2)
+time.sleep(2)
 
-	# calling pause two time will restart the playback
-	print("re-pause")
-	player.pause()
-
-	time.sleep(2)
-
-	player.set_position(0) # use this method to restart the playback from the beginning
-
-	time.sleep(2)
-
-	#player.stop() # will exit current vlc window (desktop will be visible)
-	"""
-
+print("Player stop")
+player.stop() # will exit current vlc window (desktop will be visible)
 
 
 """
@@ -92,4 +82,3 @@ for i in range(4):
 player.stop()
 print("stop")
 """
-
