@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
 
-# VLC PLAYER and GPIO integration
+# VLC PLAYER playlist test
 
-# 2019-11-19 - TODO
-# 1. test with real file - DONE
-# 2. test loop
-# 3. add a functionality for pushbutton polarity inversion - DONE
-# 4. ridimensiona finestra di rendering
-# 5. aggiungi un sistema per tenere traccia della posizione relativa della playhead - DONE
-# 6. improve thread managment
-# 7. add a way to pause video when both buttons are not operated - DONE
-# 8. test playlist mode
- 
+
 #Import the required modules
 import smbus, time, shlex, glob, random, sys
 from subprocess import Popen, PIPE
@@ -21,9 +12,12 @@ from subprocess import Popen, PIPE
 # for reference
 
 import vlc
-videoPlayer = None
-#pathToVideoFile = "/home/pi/Videos/alvanoto.mp4"
-pathToVideoFile = "/home/pi/Videos/Aboca/ABOCA_NASCITA_60SEC_ITA_innovazione per la salute.mp4"
+mediaList = None
+mediaListPlayer = None
+mediaPlayer = None
+pathToVideoFile1 = "/home/pi/Videos/Aboca/ABOCA_NASCITA_60SEC_ITA_innovazione per la salute.mp4"
+pathToVideoFile2 = "/home/pi/Videos/Aboca/ABOCA_NASCITA_60SEC_ENG.mp4"
+
 
 # global variable to be used
 # for scanning input devices
@@ -31,7 +25,7 @@ inputLen = None
 prevInputLen = None
 process = None
 
-from buttonManager import ButtonManager
+#from buttonManager import ButtonManager
 		
 def goToStartCallBack():
 	global videoPlayer
@@ -53,7 +47,6 @@ def getInputDevices():
 	proc = Popen( args, stdout=PIPE )
 	output = proc.communicate()[0]
 	return len( output.split() )
-
 
 def areThereNewInputsDevices():
 	global inputLen, prevInputLen
@@ -81,7 +74,7 @@ def checkLength():
 
 def main():
 	#print( "main" )
-	global inputLen, prevInputLen, videoPlayer, position
+	global inputLen, prevInputLen, mediaList, mediaListPlayer, mediaPlayer, position
 
 	# Wait the system to boot up correctly
 	#time.sleep(10)
@@ -89,25 +82,23 @@ def main():
 	# Open video player
 	try:
 		print( " load the video " )
-		videoPlayer = vlc.MediaPlayer( pathToVideoFile )
-		#process = Popen( args, stdin=PIPE, stdout=PIPE )
-		#print("This is the omxplayer process id: ",  process.pid )
+		# create a list of media
+		mediaList = vlc.MediaList()
+		# and add itmes to it
+		mediaList.add_media( pathToVideoFile1 )
+		mediaList.add_media( pathToVideoFile2 )
+		# create the player which will play that list
+		mediaListPlayer = vlc.MediaListPlayer()
+		mediaListPlayer.set_media_list( mediaList  )
 	except Exception as exc:
 		print("something went wrong {}".format(exc) )
 		quit()
 	
-	checkPositionThread = threading.Thread(target=checkLength)
-	checkPositionThread.start()
+	mediaListPlayer.set_playback_mode( vlc.PlaybackMode.loop )
+	mediaListPlayer.play_item( mediaList.item_at_index(0) )
+	mediaPlayer = mediaListPlayer.get_media_player()
+	mediaPlayer.toggle_fullscreen()
 	
-	print( "video length {}".format(videoPlayer.get_length() ) )
-	
-	videoPlayer.audio_set_volume(70)
-	videoPlayer.play()
-	videoPlayer.toggle_fullscreen() # use it to go fullscreen
-	#videoPlayer.video_set_scale(0.5)
-	
-	bMan = ButtonManager(goToStartCallBack, pauseVideoCallBack, polarity=False)	
-
 	inputLen = getInputDevices()
 	prevInputLen = inputLen
 
@@ -129,10 +120,9 @@ def main():
 			# exit the python script
 			quit()
 		else:
-			bMan.update()
-			print("position {}".format(position) )
-			if position >= 0.99:
-				videoPlayer.set_position( 0.0 )
+			#print("position {}".format(position) )
+			#if position >= 0.99:
+			#	videoPlayer.set_position( 0.0 )
 			time.sleep(0.1)
 			
 
