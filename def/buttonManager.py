@@ -2,7 +2,7 @@ from button import DebounceButton
 import RPi.GPIO as GPIO
 
 buttons = []
-gpios = [40, 38]
+gpios = [40, 38] #GPIO21, GPIO20
 status = [True, True]
 
 class ButtonManager:
@@ -11,14 +11,14 @@ class ButtonManager:
 	
 	# polarity: use True if a release should trigger the action on the video
 	# use False if it is a push which will trigger it.
-	def __init__(self, goToStartCb, pauseCb, polarity=False):
+	def __init__(self, goToStartCb=None, pauseCb=None, polarity=False):
 		self.goToStartCb = goToStartCb
 		self.pauseCb = pauseCb
 		self.polarity = polarity
 		self.precedence = False
 		GPIO.setmode( GPIO.BOARD )
 		for i, gpio in enumerate(gpios):
-			print("button {} - gpio {};".format(i, gpio) )
+			print("BUTTON MANAGER: button {} - gpio {};".format(i, gpio) )
 			buttons.append( DebounceButton(gpio, 50) )
 		
 	def update(self):
@@ -40,12 +40,16 @@ class ButtonManager:
 			if self.polarity:
 				if s and not self.precedence:
 					self.precedence = True
-					self.goToStartCb()
+					# call the callback function only if defined
+					if self.goToStartCb:
+						self.goToStartCb()
 					break
 			else:
 				if not s and not self.precedence:
 					self.precedence = True
-					self.goToStartCb()
+					# call the callback function only if defined
+					if self.goToStartCb:
+						self.goToStartCb()
 					break
 		
 		# let's pretend we want to reset the internal state of
@@ -68,6 +72,8 @@ class ButtonManager:
 		# state of the button manager.
 		if reset and self.precedence:
 			self.precedence = False
-			self.pauseCb()
+			# call the callback function only if defined
+			if self.pauseCb:
+				self.pauseCb()
 		
 		
