@@ -1,37 +1,21 @@
 #!/usr/bin/env python3
 
-# VLC PLAYER and GPIO integration
+# OMX PLAYER and GPIO integration
+# Thank to Phasor1 for precious support
 
-# 2019-11-19 - TODO
-# 1. test with real file - DONE
-# 2. test loop
-# 3. add a functionality for pushbutton polarity inversion - DONE
-# 4. ridimensiona finestra di rendering
-# 5. aggiungi un sistema per tenere traccia della posizione relativa della playhead - DONE
-# 6. improve thread managment
-# 7. add a way to pause video when both buttons are not operated - DONE
-# 8. test playlist mode
- 
+# CHANGE VIDEO FILE NAME HERE **************************************************
+
+#PATH_TO_VIDEO_FILE = "/home/pi/Videos/alvanoto.mp4"
+#PATH_TO_VIDEO_FILE = "/home/pi/Videos/Aboca/ABOCA_NASCITA_60SEC_ITA_innovazione per la salute.mp4"
+#PATH_TO_VIDEO_FILE = "/home/pi/Videos/Aboca/Kennedy_HD.mp4"
+#PATH_TO_VIDEO_FILE = "/home/pi/Videos/Aboca/ABOCA_InfiniteZoom_ITALIA_ABOCAINNOVAZIONE_2.mov"
+PATH_TO_VIDEO_FILE = "/home/pi/Videos/Aboca/Aboca_IST_ITA_subENG_set2018.mp4"
+
+# DO NOT CHANGE ANYTHING BELOW *************************************************
+
 #Import the required modules
-import smbus, time, shlex, glob, random, sys
+import smbus, time, shlex, glob, random, sys, socket, os, threading
 from subprocess import Popen, PIPE
-
-# see: https://git.videolan.org/?p=vlc/bindings/python.git;a=blob;f=generated/3.0/vlc.py;h=e3245a5116946a4b52cadf5642441daa97af022d;hb=HEAD 
-# and: https://olivieraubert.net/vlc/python-ctypes/doc/vlc.MediaPlayer-class.html
-# for reference
-
-from omxplayer.player import OMXPlayer
-videoPlayer = None
-bUseVideo = True
-#time in seconds to wait for the user to bring the speaker to his hear
-# before start the video reproduction
-courtesyTime = 1
-
-#pathToVideoFile = "/home/pi/Videos/alvanoto.mp4"
-#pathToVideoFile = "/home/pi/Videos/Aboca/ABOCA_NASCITA_60SEC_ITA_innovazione per la salute.mp4"
-#pathToVideoFile = "/home/pi/Videos/Aboca/Kennedy_HD.mp4"
-#pathToVideoFile = "/home/pi/Videos/Aboca/ABOCA_InfiniteZoom_ITALIA_ABOCAINNOVAZIONE_2.mov"
-pathToVideoFile = "/home/pi/Videos/Aboca/Aboca_IST_ITA_subENG_set2018.mp4"
 
 # global variable to be used
 # for scanning input devices
@@ -39,35 +23,54 @@ inputLen = None
 prevInputLen = None
 process = None
 
+from omxplayer.player import OMXPlayer
+videoPlayer = None
+B_USE_VIDEO = True
+
+# time in seconds to wait for the user to bring the speaker to his hear
+# before start the video reproduction
+COURTESY_TIME = 1
+AUDIO_MAX_VOLUME = 1.0
+AUDIO_MIN_VOLUME = 0.0
+
+
 from buttonManager import ButtonManager
-		
-def goToStartCallBack():
+
+# A callback to be passed to the button manager.
+# It will be called when at least one of the two audio receiver
+# has been lifter
+def goToStart_CB():
 	global videoPlayer
 	print("** go to start callback **")
 	print( "    start video from position 0.0")
-	if bUseVideo:
+	if B_USE_VIDEO:
 		videoPlayer.pause()
-		time.sleep( courtesyTime )
-		videoPlayer.set_position(0.0) 
-		videoPlayer.set_volume(1.0)
+		time.sleep( COURTESY_TIME )
+		videoPlayer.set_position(0.0)
+		videoPlayer.set_volume( AUDIO_MAX_VOLUME )
 		# the video is in pause so start playing it
 		videoPlayer.play()
-	
-def pauseVideoCallBack():
-	global videoPlayer
-	print("** pauseVideo callback **")
-	print( "    pause video ")
-	if bUseVideo:
-		videoPlayer.set_volume(0.0)
-		# ~ videoPlayer.pause() 
 
+
+# A callback to be passed to the button manager.
+# It will be called when both the audio receivers
+# will be hanged up
+def muteAudio_CB():
+	global videoPlayer
+	print("** mute audio callback **")
+	print( "    mute audio ")
+	if B_USE_VIDEO:
+		videoPlayer.set_volume( AUDIO_MIN_VOLUME )
+		#videoPlayer.pause()
+
+
+# CHECK INPUT DEVICES STUFF ****************************************************
 def getInputDevices():
 	cmd  = 'ls /dev/input'
 	args = shlex.split( cmd )
 	proc = Popen( args, stdout=PIPE )
 	output = proc.communicate()[0]
 	return len( output.split() )
-
 
 def areThereNewInputsDevices():
 	global inputLen, prevInputLen
@@ -83,17 +86,21 @@ def areThereNewInputsDevices():
 		prevInputLen = inputLen
 		return False
 
-import threading, socket, os
+
+"""
+#20200714 - not used anymore
 checkPositionThread = None
 position = None
 def checkLength():
 	global videoPlayer, position
 	while 1:
-		if bUseVideo:
+		if B_USE_VIDEO:
 			position = videoPlayer.get_position() # 0.0 - 1.0 position
 			#print( "player position: {}".format( position ) )
 		time.sleep(0.1)
-		
+"""
+
+# SHUTDOWN HANDLER STUFF *******************************************************
 
 shutdownHandlerThread = None
 # This method is in charge to shutdown the pi when it gets
@@ -104,7 +111,7 @@ def shutdownHandler():
 	conn = None
 	addr = None
 	mysock = None
-	
+
 	try:
 		mysock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	except socket.error:
@@ -132,7 +139,7 @@ def shutdownHandler():
 			break
 		else:
 			print("SHUTDOWN HANDLER: what?")
-	
+
 	# if we are here it means someone asked the pi to shutdown
 	# so we cal the shell script in charge of doing this.
 	# Inside the script there's an instruction to wait 10 secs
@@ -145,65 +152,70 @@ def shutdownHandler():
 		print("SHUTDOWN HANDLER: I wasn't able to call the shutdown script")
 
 	print("SHUTDOWN HANDLER: trying to close everything")
-	
+
 	# close here the thing to be closed
-		
+
 	conn.close()
 	mysock.close()
 	sys.exit(0)
 
+
+# MAIN START HERE **************************************************************
+
 def main():
 	#print( "main" )
-	global inputLen, prevInputLen, videoPlayer, position
+	global inputLen, prevInputLen, videoPlayer
 
-	# Wait the system to boot up correctly
-	#time.sleep(10)
-	
 	# Open video player
 	try:
 		print( "MAIN: load the video " )
-		videoPlayer = OMXPlayer(pathToVideoFile, args=['--no-osd', '--adev', 'local'])
-		videoPlayer.set_volume(0.0)
-		# ~ videoPlayer = vlc.MediaPlayer( pathToVideoFile )
+		videoPlayer = OMXPlayer(PATH_TO_VIDEO_FILE, args=['--no-osd', '--adev', 'local'])
+		#videoPlayer.set_volume( AUDIO_MIN_VOLUME )
+
+		#2020-13-07 - we are not using VLC anymore :(
+		# ~ videoPlayer = vlc.MediaPlayer( PATH_TO_VIDEO_FILE )
 		#process = Popen( args, stdin=PIPE, stdout=PIPE )
 		#print("This is the omxplayer process id: ",  process.pid )
+
 	except Exception as exc:
-		print("MAIN: something went wrong {}".format(exc) )
+		print("MAIN: something went wrong in creating the OMX video player {}".format(exc) )
 		quit()
-	
+
+	#2020-13-07 - we are not a separate thread anymore to check for the actual playhead position
 	#checkPositionThread = threading.Thread(target=checkLength)
 	#checkPositionThread.start()
-	
+
 	print( "MAIN: video length {}".format(videoPlayer.duration() ) )
-	if bUseVideo:
-		videoPlayer.set_volume(0.0)
+
+	if B_USE_VIDEO:
+		videoPlayer.set_volume(AUDIO_MIN_VOLUME)
+		# 2020-07-13 - no need to use fullscreen anymore
 		# ~ videoPlayer.toggle_fullscreen() # use it to go fullscreen
 		videoPlayer.play()
-		
-		#time.sleep(1)
-		#videoPlayer.pause()
-		#videoPlayer.video_set_scale(0.5)
-	
-	bMan = ButtonManager(goToStartCallBack, pauseVideoCallBack, polarity=False)	
-	# ~ bMan = ButtonManager(goToStartCallBack, polarity=False)	
 
+
+	# initialize Button manager
+	buttonManager = ButtonManager(goToStart_CB, muteAudio_CB, polarity=False)
+
+	# get the current number of connected input devices
 	inputLen = getInputDevices()
 	prevInputLen = inputLen
-	
+
 	# start the shutdown handler function.
 	# It will take care of opening and listening on a socket
-	# for a "shutdown message".
+	# for a "shutdown message" in order to kill the python process
+	# and shutdown the RaspberryPi
 	shutdownHandlerThread = threading.Thread(target=shutdownHandler)
 	shutdownHandlerThread.start()
 
+
 	# Main loop
 	while True:
-		# check is someone plugged in a mouse or a keyboard
+		# check if someone plugged in a mouse or a keyboard
 		if( areThereNewInputsDevices() ):
-			# new input devices have been found
- 			# script must be stopped in order
-			# to let space for the user to work
-			# with the Pi
+			# if a new input device has been found, tthis very script
+			# must be stopped in order to let space for the user to work
+			# with the Pi, so...
 
 			# quit video player
 			videoPlayer.stop() # will exit current vlc window (desktop will be visible)
@@ -214,14 +226,13 @@ def main():
 			# exit the python script
 			quit()
 		else:
-			bMan.update()
+			buttonManager.update()
 			#print("MAIN: position {}".format(position) )
-			if bUseVideo:
+			if B_USE_VIDEO:
 				position = videoPlayer.position()
 				if videoPlayer.duration() - position <= 1:
 					videoPlayer.set_position( 0.0 )
 			time.sleep(0.1)
-			
 
 
 if __name__ == '__main__':

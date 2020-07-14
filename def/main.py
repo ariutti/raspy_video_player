@@ -26,12 +26,11 @@ bUseVideo = True
 #time in seconds to wait for the user to bring the speaker to his hear
 # before start the video reproduction
 courtesyTime = 1
+audioMaxVolume = 70 # 0 - 100
 
-#pathToVideoFile = "/home/pi/Videos/alvanoto.mp4"
-#pathToVideoFile = "/home/pi/Videos/Aboca/ABOCA_NASCITA_60SEC_ITA_innovazione per la salute.mp4"
-#pathToVideoFile = "/home/pi/Videos/Aboca/Kennedy_HD.mp4"
-#pathToVideoFile = "/home/pi/Videos/Aboca/ABOCA_InfiniteZoom_ITALIA_ABOCAINNOVAZIONE_2.mov"
-pathToVideoFile = "/home/pi/Videos/Aboca/Aboca_IST_ITA_subENG_set2018.mp4"
+
+#pathToVideoFile = "/home/pi/Videos/Aboca/Aboca_IST_ITA_subENG_set2018.mp4"
+pathToVideoFile = "/home/pi/Videos/Aboca/Aboca_VideoCavaliere_subENG_60sec_giu2020.mp4"
 
 # global variable to be used
 # for scanning input devices
@@ -44,20 +43,26 @@ from buttonManager import ButtonManager
 def goToStartCallBack():
 	global videoPlayer
 	print("** go to start callback **")
-	print( "    start video from position 0.0")
 	if bUseVideo:
 		videoPlayer.pause()
 		time.sleep( courtesyTime )
-		videoPlayer.set_position(0.0) 
+		videoPlayer.set_position(0.0)
+		videoPlayer.audio_set_volume( audioMaxVolume )
 		# the video is in pause so start playing it
 		videoPlayer.play()
 	
 def pauseVideoCallBack():
 	global videoPlayer
 	print("** pauseVideo callback **")
-	print( "    pause video ")
 	if bUseVideo:
 		videoPlayer.pause() 
+		
+def muteAudioCallBack():
+	global videoPlayer
+	print("** muteAudio callback **")
+	if bUseVideo:
+		videoPlayer.audio_set_volume( 0 )
+	
 
 def getInputDevices():
 	cmd  = 'ls /dev/input'
@@ -173,7 +178,7 @@ def main():
 	print( "MAIN: video length {}".format(videoPlayer.get_length() ) )
 	
 	if bUseVideo:
-		videoPlayer.audio_set_volume(70)
+		videoPlayer.audio_set_volume( audioMaxVolume )
 		videoPlayer.toggle_fullscreen() # use it to go fullscreen
 		videoPlayer.play()
 		
@@ -182,7 +187,7 @@ def main():
 		#videoPlayer.video_set_scale(0.5)
 	
 	#bMan = ButtonManager(goToStartCallBack, pauseVideoCallBack, polarity=False)	
-	bMan = ButtonManager(goToStartCallBack, polarity=False)	
+	bMan = ButtonManager(goToStartCallBack, muteAudioCallBack, polarity=False)	
 
 	inputLen = getInputDevices()
 	prevInputLen = inputLen
